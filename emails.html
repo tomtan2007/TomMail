@@ -87,7 +87,6 @@
     .course-pill { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
     .type-badge { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
     .badge-grade    { background: #d1fae5; color: #065f46; }
-    .badge-graded   { background: #dbeafe; color: #1e40af; }
     .badge-announce { background: var(--bg-secondary); color: var(--text-secondary); }
     .email-title { font-size: 13px; font-weight: 500; line-height: 1.4; margin-bottom: 4px; }
     .email-preview { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
@@ -217,28 +216,39 @@ const PAGE     = 30;
 let activeType   = 'all';
 let activeCourse = 'all';
 
-// ── Course colours ────────────────────────────────────────────────────────────
-const KNOWN_COLORS = {
-  'PHYSICS 240':   {color:'#dbeafe', text:'#1e40af'},
-  'PHYSICS 241':   {color:'#bfdbfe', text:'#1d4ed8'},
-  'ASIAN 325':     {color:'#ede9fe', text:'#5b21b6'},
-  'CHEM 215':      {color:'#d1fae5', text:'#065f46'},
-  'Chemistry 215': {color:'#d1fae5', text:'#065f46'},
-  'Chemistry 216': {color:'#a7f3d0', text:'#047857'},
-  'CHEM 216':      {color:'#a7f3d0', text:'#047857'},
-  'PSYCH 111':     {color:'#fef3c7', text:'#92400e'},
+// ── Courses ───────────────────────────────────────────────────────────────────
+// Canonical course list — everything else maps to "Other"
+const COURSES = {
+  'CHEM 215':    {color:'#d1fae5', text:'#065f46'},
+  'CHEM 216':    {color:'#a7f3d0', text:'#047857'},
+  'PHYSICS 240': {color:'#dbeafe', text:'#1e40af'},
+  'PHYSICS 241': {color:'#bfdbfe', text:'#1d4ed8'},
+  'ASIAN 325':   {color:'#ede9fe', text:'#5b21b6'},
+  'PSYCH 111':   {color:'#fef3c7', text:'#92400e'},
+  'Other':       {color:'#f1f0eb', text:'#5a5a55'},
 };
-const AUTO_PALETTE = [
-  {color:'#fce7f3', text:'#9d174d'}, {color:'#e0f2fe', text:'#0c4a6e'},
-  {color:'#fdf4ff', text:'#6b21a8'}, {color:'#fff7ed', text:'#9a3412'},
-  {color:'#f0fdf4', text:'#14532d'},
-];
-const dynColors = {}; let palIdx = 0;
-function courseColor(c) {
-  if (KNOWN_COLORS[c]) return KNOWN_COLORS[c];
-  if (!dynColors[c]) dynColors[c] = AUTO_PALETTE[palIdx++ % AUTO_PALETTE.length];
-  return dynColors[c];
+
+// Normalize raw "From" display names and subject text to canonical course
+// Handles: "Chemistry 216 WN 2026", "CHEM 216 300 WN 2026", "PSYCH 111 060 WN 2026",
+//          "Lab 09 Section 074 - Group 2", "BME Student Resources", etc.
+function normalizeCourse(fromName, subject) {
+  const combined = (fromName + ' ' + subject).toUpperCase();
+  // Check each canonical course — order matters (check 216 before 215 etc.)
+  const checks = [
+    ['CHEM 216',    /CHEM(?:ISTRY)?\s*216/],
+    ['CHEM 215',    /CHEM(?:ISTRY)?\s*215/],
+    ['PHYSICS 241', /PHYSICS\s*241/],
+    ['PHYSICS 240', /PHYSICS\s*240/],
+    ['ASIAN 325',   /ASIAN\s*325/],
+    ['PSYCH 111',   /PSYCH\s*111/],
+  ];
+  for (const [name, re] of checks) {
+    if (re.test(combined)) return name;
+  }
+  return 'Other';
 }
+
+function courseColor(c) { return COURSES[c] || COURSES['Other']; }
 
 // ── CSV parsing ───────────────────────────────────────────────────────────────
 function parseCSV(text) {
@@ -265,16 +275,8 @@ function parseCSV(text) {
 }
 
 // ── Email parsing ─────────────────────────────────────────────────────────────
-function extractCourse(from) {
-  let n = from.split('<')[0].trim();
-  n = n.replace(/\s+(WN|FA|SP|SU)\s+\d{4}.*/i, '').trim();
-  n = n.replace(/\s+\d{3}$/, '').trim();
-  return n || 'Canvas';
-}
 function parseType(subject) {
-  if (/^grade changed:/i.test(subject))     return 'grade-changed';
-  if (/^submission posted:/i.test(subject)) return 'submission-posted';
-  if (/^assignment graded:/i.test(subject)) return 'assignment-graded';
+  if (/^(grade changed|submission posted|assignment graded):/i.test(subject)) return 'grade';
   return 'announcement';
 }
 function extractAssignment(subject) {
@@ -300,9 +302,9 @@ function gradeStyle(pct) {
 }
 function parseEmail(raw) {
   const fromRaw = raw.from.split('<')[0].trim();
-  const course  = extractCourse(raw.from);
+  const course  = normalizeCourse(fromRaw, raw.subject);
   const type    = parseType(raw.subject);
-  const isGrade = type !== 'announcement';
+  const isGrade = type === 'grade';
   const grade   = isGrade ? parseGrade(raw.body) : null;
   const title   = isGrade ? extractAssignment(raw.subject) : extractTitle(raw.subject, fromRaw);
   const preview = raw.body
@@ -354,14 +356,18 @@ function getFiltered() {
   });
 }
 function renderFilters() {
-  const courses = [...new Set(allEmails.map(e => e.course))].sort();
+  // Fixed course order matching user's actual schedule
+  const courseOrder = ['CHEM 215','CHEM 216','PHYSICS 240','PHYSICS 241','ASIAN 325','PSYCH 111','Other'];
+  const present = new Set(allEmails.map(e => e.course));
+  const courses = courseOrder.filter(c => present.has(c));
+
   document.getElementById('type-filters').innerHTML =
     ['all','grades','announcements'].map(t =>
       `<button class="filter-btn${activeType===t?' active':''}" onclick="setType('${t}')">${t}</button>`
     ).join('');
   document.getElementById('course-filters').innerHTML =
     ['all',...courses].map(c => {
-      const safe = c.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const safe = c.replace(/'/g,"\\'");
       return `<button class="filter-btn${activeCourse===c?' active':''}" onclick="setCourse('${safe}')">${c==='all'?'all courses':c}</button>`;
     }).join('');
 }
@@ -394,11 +400,9 @@ function renderEmails() {
 function cardHTML(e) {
   const cc   = courseColor(e.course);
   const pill = `<span class="course-pill" style="background:${cc.color};color:${cc.text}">${e.course}</span>`;
-  const badge =
-    e.type==='grade-changed'     ? '<span class="type-badge badge-grade">Grade changed</span>' :
-    e.type==='submission-posted' ? '<span class="type-badge badge-graded">Graded</span>' :
-    e.type==='assignment-graded' ? '<span class="type-badge badge-graded">Graded</span>' :
-                                   '<span class="type-badge badge-announce">Announcement</span>';
+  const badge = e.isGrade
+    ? '<span class="type-badge badge-grade">Grade</span>'
+    : '<span class="type-badge badge-announce">Announcement</span>';
   let body = '';
   if (e.isGrade && e.grade) {
     const g=e.grade, gs=gradeStyle(g.pct);
