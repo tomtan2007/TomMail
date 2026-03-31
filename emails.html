@@ -181,7 +181,7 @@
         <input class="setup-input" id="url-input" type="text" placeholder="https://script.google.com/macros/s/…/exec" />
         <button class="btn btn-primary" onclick="saveUrl()">Save</button>
       </div>
-      <div class="setup-note">The URL is saved only in your browser's localStorage. Make sure you're logged into your UMich Google account in this browser — it uses your existing session to authenticate.</div>
+      <div class="setup-note">When you click Refresh, a small popup window will open briefly to fetch your emails using your Google session, then close automatically. Make sure popups are allowed for this site.</div>
     </div>
   </div>
 
@@ -281,25 +281,43 @@ function parseEmail(raw) {
     gmailUrl: `https://mail.google.com/mail/u/0/#all/${raw.id}`};
 }
 
-// ── JSONP fetch ───────────────────────────────────────────────────────────────
-// Uses a <script> tag so the browser automatically sends your Google session
-// cookies — no proxy or OAuth needed, works with "Anyone with Google account".
-function jsonpFetch(url) {
+// ── Popup fetch ───────────────────────────────────────────────────────────────
+// Opens the script in a small popup window. The browser sends Google session
+// cookies so it authenticates via your existing UMich login. The script returns
+// an HTML page that calls postMessage() back to this window, then closes itself.
+function popupFetch(url) {
   return new Promise((resolve, reject) => {
-    const cb = '__canvas_cb_' + Date.now();
-    let script;
-    const timer = setTimeout(() => {
-      delete window[cb]; script && script.remove();
-      reject(new Error('Request timed out'));
-    }, 20000);
-    window[cb] = data => {
-      clearTimeout(timer); delete window[cb]; script.remove();
-      resolve(data);
+    let settled = false;
+    const settle = (fn, val) => {
+      if (settled) return; settled = true;
+      window.removeEventListener('message', onMsg);
+      clearTimeout(timer);
+      fn(val);
     };
-    script = document.createElement('script');
-    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
-    script.onerror = () => { clearTimeout(timer); delete window[cb]; script.remove(); reject(new Error('Failed to load script — make sure you are logged into your UMich Google account in this browser.')); };
-    document.head.appendChild(script);
+
+    const onMsg = e => {
+      if (!e.data || !e.data.emails) return;
+      settle(resolve, e.data);
+    };
+    window.addEventListener('message', onMsg);
+
+    const popup = window.open(url, 'canvas_fetch',
+      'width=480,height=360,left=200,top=200,menubar=no,toolbar=no,location=no');
+    if (!popup) {
+      settle(reject, new Error('Popup was blocked — please allow popups for this site and try again.'));
+      return;
+    }
+
+    // If user closes popup manually before data arrives
+    const pollClosed = setInterval(() => {
+      if (popup.closed) { clearInterval(pollClosed); settle(reject, new Error('Popup was closed before data loaded.')); }
+    }, 500);
+
+    const timer = setTimeout(() => {
+      clearInterval(pollClosed);
+      try { popup.close(); } catch(_) {}
+      settle(reject, new Error('Timed out — make sure you are logged into your UMich Google account and authorized the script during deployment.'));
+    }, 45000);
   });
 }
 
@@ -309,7 +327,7 @@ async function loadEmails() {
   document.getElementById('main-content').style.display = 'block';
   showLoading();
   try {
-    const data = await jsonpFetch(SCRIPT_URL);
+    const data = await popupFetch(SCRIPT_URL);
     if (!data.emails) throw new Error('Unexpected response from script.');
     allEmails = data.emails.map(parseEmail).sort((a,b) => b.ts - a.ts);
     displayed = Math.min(PAGE, allEmails.length);
