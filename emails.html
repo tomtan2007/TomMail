@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Canvas Emails — Tom's Dashboard</title>
-  <script src="https://accounts.google.com/gsi/client" onload="onGsiLoad()" async defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -43,42 +42,44 @@
     .back-link:hover { color: var(--text-secondary); }
     .greeting { font-size: 22px; font-weight: 500; }
 
-    .section-label { font-size: 11px; font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
-
     .btn { font-size: 13px; font-family: var(--font); padding: 7px 16px; border-radius: var(--radius-md); cursor: pointer; border: 0.5px solid var(--border-mid); background: none; color: var(--text); }
     .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
     .btn-sm { padding: 5px 12px; font-size: 12px; }
 
-    /* Setup screen */
-    .setup-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; max-width: 520px; margin: 3rem auto; }
+    /* ── Setup screen ── */
+    .setup-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; max-width: 600px; margin: 2rem auto; }
     .setup-title { font-size: 17px; font-weight: 500; margin-bottom: 8px; }
     .setup-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem; }
-    .setup-steps { margin-bottom: 1.5rem; }
-    .setup-step { display: flex; gap: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
-    .step-num { width: 20px; height: 20px; min-width: 20px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; margin-top: 1px; }
+    .setup-step { display: flex; gap: 12px; margin-bottom: 12px; font-size: 13px; line-height: 1.6; }
+    .step-num { width: 20px; height: 20px; min-width: 20px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; margin-top: 2px; }
+    .code-block { background: var(--bg-secondary); border: 0.5px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; font-size: 12px; font-family: 'SF Mono', 'Fira Code', monospace; white-space: pre; overflow-x: auto; margin: 10px 0 4px; line-height: 1.6; color: var(--text); }
+    .copy-btn { font-size: 11px; font-family: var(--font); color: var(--text-tertiary); background: none; border: none; cursor: pointer; padding: 0; }
+    .copy-btn:hover { color: var(--text-secondary); }
+    .setup-divider { border: none; border-top: 0.5px solid var(--border); margin: 1.5rem 0; }
     .setup-input-row { display: flex; gap: 8px; }
     .setup-input { flex: 1; font-size: 13px; font-family: var(--font); border: 0.5px solid var(--border-mid); border-radius: var(--radius-md); padding: 7px 10px; background: var(--bg); color: var(--text); }
     .setup-input:focus { outline: none; border-color: var(--text-secondary); }
     .setup-link { color: var(--text-secondary); }
+    .setup-note { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; }
 
-    /* Filter bar */
+    /* ── Filters ── */
     .filter-section { margin-bottom: 16px; }
     .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
     .filter-btn { font-size: 11px; padding: 3px 10px; border-radius: 20px; border: 0.5px solid var(--border-mid); background: none; color: var(--text-secondary); cursor: pointer; font-family: var(--font); }
     .filter-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 
-    /* Stats row */
+    /* ── Stats ── */
     .stats-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
     .stat { font-size: 12px; color: var(--text-secondary); }
     .stat strong { color: var(--text); font-weight: 500; }
 
-    /* Email cards */
+    /* ── Email cards ── */
     .email-feed { display: flex; flex-direction: column; gap: 8px; }
-    .email-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; cursor: pointer; transition: border-color 0.1s; text-decoration: none; display: block; color: inherit; }
+    .email-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; text-decoration: none; display: block; color: inherit; }
     .email-card:hover { border-color: var(--border-mid); }
     .email-card.unread { border-left: 3px solid var(--text); }
 
-    .email-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .email-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
     .email-card-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; }
     .email-date { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
     .unread-dot { width: 7px; height: 7px; border-radius: 50%; background: #3b82f6; flex-shrink: 0; }
@@ -88,21 +89,16 @@
     .badge-grade    { background: #d1fae5; color: #065f46; }
     .badge-graded   { background: #dbeafe; color: #1e40af; }
     .badge-announce { background: var(--bg-secondary); color: var(--text-secondary); }
-    .badge-other    { background: var(--bg-tertiary); color: var(--text-tertiary); }
 
     .email-title { font-size: 13px; font-weight: 500; line-height: 1.4; margin-bottom: 4px; }
     .email-preview { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 
-    /* Grade score display */
-    .grade-score { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 4px 10px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; }
+    .grade-score { display: inline-flex; align-items: baseline; gap: 5px; margin-top: 6px; padding: 4px 10px; border-radius: var(--radius-md); }
     .grade-score-val { font-size: 15px; font-weight: 600; }
-    .grade-score-pct { font-size: 11px; opacity: 0.75; }
+    .grade-score-pct { font-size: 11px; opacity: 0.7; }
 
-    /* Date dividers */
-    .date-divider { font-size: 11px; font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.06em; text-transform: uppercase; padding: 12px 0 6px; }
-    .date-divider:first-child { padding-top: 0; }
+    .date-divider { font-size: 11px; font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.06em; text-transform: uppercase; padding: 14px 0 6px; }
 
-    /* Loading / empty */
     .state-msg { text-align: center; padding: 3rem 1rem; color: var(--text-secondary); font-size: 13px; }
     .loading-dots { display: inline-flex; gap: 4px; }
     .loading-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); animation: bounce 1.2s infinite ease-in-out; }
@@ -111,6 +107,8 @@
     @keyframes bounce { 0%,80%,100%{transform:scale(0.6);opacity:.4} 40%{transform:scale(1);opacity:1} }
 
     .load-more-wrap { text-align: center; padding: 16px 0 4px; }
+    .reset-link { font-size: 11px; color: var(--text-tertiary); background: none; border: none; cursor: pointer; font-family: var(--font); padding: 0; }
+    .reset-link:hover { color: var(--text-secondary); }
   </style>
 </head>
 <body>
@@ -122,42 +120,66 @@
       <span class="greeting">Canvas Emails</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <button id="refresh-btn" class="btn btn-sm" style="display:none" onclick="loadEmails()">↻ Refresh</button>
-      <button id="auth-btn" class="btn btn-primary" style="display:none" onclick="requestToken()">Connect Gmail</button>
+      <button id="refresh-btn" class="btn btn-sm" style="display:none" onclick="loadEmails(true)">↻ Refresh</button>
+      <button id="reset-btn" class="reset-link" style="display:none" onclick="resetSetup()">Change script URL</button>
     </div>
   </div>
 
-  <!-- Setup screen (shown when no client ID stored) -->
+  <!-- Setup screen -->
   <div id="setup-screen" style="display:none">
     <div class="setup-card">
-      <div class="setup-title">Connect your Gmail</div>
-      <div class="setup-sub">This page reads your Canvas notification emails directly from Gmail. You need a Google OAuth Client ID — it takes about 2 minutes to set up and only needs to be done once.</div>
-      <div class="setup-steps">
-        <div class="setup-step">
-          <div class="step-num">1</div>
-          <div>Go to <a class="setup-link" href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com/apis/credentials</a> and create a project (or select an existing one).</div>
-        </div>
-        <div class="setup-step">
-          <div class="step-num">2</div>
-          <div>Click <strong>Enable APIs</strong> and enable the <strong>Gmail API</strong>.</div>
-        </div>
-        <div class="setup-step">
-          <div class="step-num">3</div>
-          <div>Go to <strong>Credentials → Create Credentials → OAuth client ID</strong>. Choose <strong>Web application</strong>.</div>
-        </div>
-        <div class="setup-step">
-          <div class="step-num">4</div>
-          <div>Under <strong>Authorized JavaScript origins</strong>, add <code id="origin-hint" style="font-size:12px;background:var(--bg-secondary);padding:1px 5px;border-radius:4px;"></code></div>
-        </div>
-        <div class="setup-step">
-          <div class="step-num">5</div>
-          <div>Copy the <strong>Client ID</strong> and paste it below.</div>
+      <div class="setup-title">One-time setup — takes about 3 minutes</div>
+      <div class="setup-sub">This page reads your Canvas emails from Gmail using a Google Apps Script you deploy yourself. No passwords or OAuth apps needed — the script runs as you in your own Google account.</div>
+
+      <div class="setup-step">
+        <div class="step-num">1</div>
+        <div>Open <a class="setup-link" href="https://script.google.com" target="_blank">script.google.com</a>, click <strong>New project</strong>, and replace all the code with this:
+          <div style="position:relative">
+            <div class="code-block" id="script-code">function doGet() {
+  var threads = GmailApp.search('from:instructure.com', 0, 50);
+  var emails = [];
+  for (var i = 0; i &lt; threads.length; i++) {
+    var msgs = threads[i].getMessages();
+    for (var j = 0; j &lt; msgs.length; j++) {
+      var m = msgs[j];
+      var body = m.getPlainBody().split('________')[0].trim();
+      emails.push({
+        id:      m.getId(),
+        subject: m.getSubject(),
+        from:    m.getFrom(),
+        date:    m.getDate().getTime(),
+        body:    body.substring(0, 600),
+        unread:  m.isUnread()
+      });
+    }
+  }
+  emails.sort(function(a,b){ return b.date - a.date; });
+  return ContentService
+    .createTextOutput(JSON.stringify({emails: emails}))
+    .setMimeType(ContentService.MimeType.JSON);
+}</div>
+            <button class="copy-btn" onclick="copyScript()" id="copy-btn">copy</button>
+          </div>
         </div>
       </div>
+
+      <div class="setup-step">
+        <div class="step-num">2</div>
+        <div>Click <strong>Deploy → New deployment</strong>. Set type to <strong>Web app</strong>, <em>Execute as</em> → <strong>Me</strong>, <em>Who has access</em> → <strong>Anyone</strong>. Click <strong>Deploy</strong> and authorize when prompted.</div>
+      </div>
+
+      <div class="setup-step">
+        <div class="step-num">3</div>
+        <div>Copy the <strong>Web app URL</strong> (starts with <code style="font-size:11px;background:var(--bg-secondary);padding:1px 5px;border-radius:4px">https://script.google.com/macros/s/…/exec</code>) and paste it below.</div>
+      </div>
+
+      <hr class="setup-divider" />
+
       <div class="setup-input-row">
-        <input class="setup-input" id="client-id-input" type="text" placeholder="123456789-abc...apps.googleusercontent.com" />
-        <button class="btn btn-primary" onclick="saveClientId()">Save</button>
+        <input class="setup-input" id="script-url-input" type="text" placeholder="https://script.google.com/macros/s/…/exec" />
+        <button class="btn btn-primary" onclick="saveScriptUrl()">Save</button>
       </div>
+      <div class="setup-note">The URL is stored only in your browser's localStorage. The script only reads your Gmail — it cannot send or delete anything.</div>
     </div>
   </div>
 
@@ -170,37 +192,31 @@
     <div id="stats-row" class="stats-row"></div>
     <div id="email-feed" class="email-feed"></div>
     <div class="load-more-wrap" id="load-more-wrap" style="display:none">
-      <button class="btn" onclick="loadMore()">Load more</button>
+      <button class="btn" onclick="showMore()">Show more</button>
     </div>
   </div>
 
 </div>
 <script>
-const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me';
+const PROXY = 'https://api.allorigins.win/get?url=';
 
-// Persist client ID; token lives in sessionStorage (cleared on tab close)
-let CLIENT_ID = localStorage.getItem('gmail_client_id') || '';
-let accessToken = sessionStorage.getItem('gmail_token') || '';
-let tokenClient = null;
-
+let SCRIPT_URL = localStorage.getItem('canvas_script_url') || '';
 let allEmails = [];
-let displayedCount = 0;
-const PAGE_SIZE = 30;
-let nextPageToken = null;
-
-let activeType = 'all';
+let displayed = 0;
+const PAGE = 30;
+let activeType   = 'all';
 let activeCourse = 'all';
 
-// ── Course colours (matches index.html + extras seen in real emails) ──────────
+// ── Course colours ────────────────────────────────────────────────────────────
 const COURSE_COLORS = {
-  'PHYSICS 240': {color:'#dbeafe', text:'#1e40af'},
-  'PHYSICS 241': {color:'#bfdbfe', text:'#1d4ed8'},
-  'ASIAN 325':   {color:'#ede9fe', text:'#5b21b6'},
-  'CHEM 215':    {color:'#d1fae5', text:'#065f46'},
+  'PHYSICS 240':   {color:'#dbeafe', text:'#1e40af'},
+  'PHYSICS 241':   {color:'#bfdbfe', text:'#1d4ed8'},
+  'ASIAN 325':     {color:'#ede9fe', text:'#5b21b6'},
+  'CHEM 215':      {color:'#d1fae5', text:'#065f46'},
   'Chemistry 215': {color:'#d1fae5', text:'#065f46'},
   'Chemistry 216': {color:'#a7f3d0', text:'#047857'},
-  'CHEM 216':    {color:'#a7f3d0', text:'#047857'},
-  'PSYCH 111':   {color:'#fef3c7', text:'#92400e'},
+  'CHEM 216':      {color:'#a7f3d0', text:'#047857'},
+  'PSYCH 111':     {color:'#fef3c7', text:'#92400e'},
 };
 const AUTO_PALETTE = [
   {color:'#fce7f3', text:'#9d174d'},
@@ -209,58 +225,46 @@ const AUTO_PALETTE = [
   {color:'#fff7ed', text:'#9a3412'},
   {color:'#f0fdf4', text:'#14532d'},
 ];
-const dynamicColors = {};
+const dynColors = {};
 let palIdx = 0;
-
-function getCourseColor(course) {
-  if (COURSE_COLORS[course]) return COURSE_COLORS[course];
-  if (!dynamicColors[course]) {
-    dynamicColors[course] = AUTO_PALETTE[palIdx++ % AUTO_PALETTE.length];
-  }
-  return dynamicColors[course];
+function getCourseColor(c) {
+  if (COURSE_COLORS[c]) return COURSE_COLORS[c];
+  if (!dynColors[c]) dynColors[c] = AUTO_PALETTE[palIdx++ % AUTO_PALETTE.length];
+  return dynColors[c];
 }
 
-// ── Parsing helpers ───────────────────────────────────────────────────────────
-function extractCourse(fromHeader) {
-  // "PSYCH 111 060 WN 2026 <notifications@instructure.com>" → "PSYCH 111"
-  let name = fromHeader.split('<')[0].trim();
-  name = name.replace(/\s+(WN|FA|SP|SU)\s+\d{4}.*/i, '').trim();  // strip semester
-  name = name.replace(/\s+\d{3}$/, '').trim();                      // strip section num
+// ── Parsing ───────────────────────────────────────────────────────────────────
+function extractCourse(from) {
+  let name = from.split('<')[0].trim();
+  name = name.replace(/\s+(WN|FA|SP|SU)\s+\d{4}.*/i, '').trim();
+  name = name.replace(/\s+\d{3}$/, '').trim();
   return name || 'Canvas';
 }
 
 function parseType(subject) {
   if (/^grade changed:/i.test(subject))     return 'grade-changed';
   if (/^submission posted:/i.test(subject)) return 'submission-posted';
-  if (/^new group membership/i.test(subject)) return 'other';
-  if (/^new submission/i.test(subject))     return 'other';
   return 'announcement';
 }
 
 function extractAssignment(subject) {
-  // "Grade Changed: Assignment Name, COURSE WN YYYY"
-  // "Submission Posted:  Assignment Name, COURSE WN YYYY"
   let s = subject.replace(/^(grade changed|submission posted):\s*/i, '').trim();
-  // Remove trailing ", COURSE [SECTION] WN YYYY"
   s = s.replace(/,\s*[A-Za-z][\w\s.]*\s+(WN|FA|SP|SU)\s+\d{4}\s*$/i, '').trim();
   return s;
 }
 
 function extractAnnouncementTitle(subject, fromRaw) {
-  // Subject: "Title: COURSE SECTION WN YYYY" — strip the course suffix
   const suffix = ': ' + fromRaw;
   if (subject.endsWith(suffix)) return subject.slice(0, -suffix.length).trim();
-  // Fallback: strip last ": something" if it looks like a course
   return subject.replace(/:\s*[A-Z][\w\s]+\s+(WN|FA|SP|SU)\s+\d{4}\s*$/i, '').trim() || subject;
 }
 
-function parseGrade(snippet) {
-  const m = snippet.match(/score:\s*([\d.]+)\s+out\s+of\s+([\d.]+)/i);
+function parseGrade(body) {
+  const m = body.match(/score:\s*([\d.]+)\s+out\s+of\s+([\d.]+)/i);
   if (!m) return null;
   const score = parseFloat(m[1]);
   const total = parseFloat(m[2]);
-  const pct   = total > 0 ? Math.round((score / total) * 100) : null;
-  return { score, total, pct };
+  return { score, total, pct: total > 0 ? Math.round(score / total * 100) : null };
 }
 
 function gradeStyle(pct) {
@@ -270,140 +274,60 @@ function gradeStyle(pct) {
   return                  {bg:'#fee2e2', text:'#991b1b'};
 }
 
-function formatDate(ts) {
-  const d    = new Date(Number(ts));
-  const now  = new Date();
-  const diff = now - d;
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return 'Today, ' + d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-  if (days === 1) return 'Yesterday';
-  if (days < 7)  return d.toLocaleDateString('en-US', {weekday:'long'});
-  return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-}
-
-function dividerLabel(ts) {
-  const d    = new Date(Number(ts));
-  const now  = new Date();
-  const diff = now - d;
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7)  return 'This week';
-  if (days < 14) return 'Last week';
-  return d.toLocaleDateString('en-US', {month:'long', year:'numeric'});
-}
-
-function parseMessage(raw) {
-  const headers = {};
-  (raw.payload?.headers || []).forEach(h => { headers[h.name] = h.value; });
-
-  const from      = headers['From'] || '';
-  const subject   = headers['Subject'] || '';
-  const isUnread  = (raw.labelIds || []).includes('UNREAD');
-  const snippet   = raw.snippet || '';
-  const ts        = raw.internalDate;
-
-  // Course from "From" display name
-  const fromRaw = from.split('<')[0].trim(); // e.g. "PSYCH 111 060 WN 2026"
-  const course  = extractCourse(from);
-
-  const type  = parseType(subject);
+function parseEmail(raw) {
+  const fromRaw = raw.from.split('<')[0].trim();
+  const course  = extractCourse(raw.from);
+  const type    = parseType(raw.subject);
   const isGrade = type === 'grade-changed' || type === 'submission-posted';
+  const grade   = isGrade ? parseGrade(raw.body) : null;
+  const title   = isGrade
+    ? extractAssignment(raw.subject)
+    : extractAnnouncementTitle(raw.subject, fromRaw);
 
-  const grade = isGrade ? parseGrade(snippet) : null;
-  const title = isGrade
-    ? extractAssignment(subject)
-    : extractAnnouncementTitle(subject, fromRaw);
+  // Clean preview: strip Canvas boilerplate
+  const preview = raw.body
+    .replace(/You received this email because[\s\S]*/i, '')
+    .replace(/View announcement[\s\S]*/i, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .substring(0, 200);
 
-  return {
-    id:       raw.id,
-    course,
-    type,
-    isGrade,
-    subject,
-    title:    title || subject,
-    snippet,
-    grade,
-    isUnread,
-    ts,
-    gmailUrl: `https://mail.google.com/mail/u/0/#all/${raw.id}`,
-  };
+  return { id: raw.id, course, type, isGrade, title: title || raw.subject, preview, grade, isUnread: raw.unread, ts: raw.date,
+    gmailUrl: `https://mail.google.com/mail/u/0/#all/${raw.id}` };
 }
 
-// ── Gmail API fetching ────────────────────────────────────────────────────────
-async function gmailGet(path, params = {}) {
-  const url = new URL(GMAIL_API + path);
-  Object.entries(params).forEach(([k, v]) => {
-    if (Array.isArray(v)) v.forEach(val => url.searchParams.append(k, val));
-    else url.searchParams.set(k, v);
-  });
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
-  if (r.status === 401) { handleExpiredToken(); throw new Error('401'); }
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-}
-
-async function fetchMessageDetails(ids) {
-  // Parallel batch of metadata fetches
-  return Promise.all(ids.map(id =>
-    gmailGet(`/messages/${id}`, {
-      format: 'metadata',
-      metadataHeaders: ['From', 'Subject', 'Date'],
-    })
-  ));
-}
-
-async function loadEmails(isRefresh = false) {
-  if (!accessToken) { showAuthButton(); return; }
-  if (isRefresh) { allEmails = []; nextPageToken = null; displayedCount = 0; }
-
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+async function loadEmails(force = false) {
+  if (force) allEmails = [];
   showLoading();
 
   try {
-    const listParams = { q: 'from:instructure.com', maxResults: 50 };
-    if (nextPageToken) listParams.pageToken = nextPageToken;
+    const url  = PROXY + encodeURIComponent(SCRIPT_URL);
+    const resp = await fetch(url);
+    const json = await resp.json();
+    const data = JSON.parse(json.contents);
 
-    const list = await gmailGet('/messages', listParams);
-    nextPageToken = list.nextPageToken || null;
+    if (!data.emails) throw new Error('Unexpected response');
 
-    const ids = (list.messages || []).map(m => m.id);
-    if (!ids.length) { renderEmails(); return; }
+    allEmails = data.emails.map(parseEmail).sort((a, b) => b.ts - a.ts);
+    displayed = Math.min(PAGE, allEmails.length);
 
-    // Fetch in parallel batches of 10
-    const batches = [];
-    for (let i = 0; i < ids.length; i += 10) batches.push(ids.slice(i, i + 10));
-    const allRaw = (await Promise.all(batches.map(fetchMessageDetails))).flat();
-
-    allEmails = [...allEmails, ...allRaw.map(parseMessage)]
-      .sort((a, b) => Number(b.ts) - Number(a.ts));
-
-    displayedCount = Math.min(PAGE_SIZE, allEmails.length);
-
-    document.getElementById('refresh-btn').style.display = 'block';
     document.getElementById('main-content').style.display = 'block';
+    document.getElementById('refresh-btn').style.display  = 'block';
+    document.getElementById('reset-btn').style.display    = 'block';
     renderFilters();
     renderEmails();
   } catch (e) {
-    if (e.message !== '401') showError('Could not load emails. ' + e.message);
+    showError('Could not load emails. Check that your script URL is correct and the deployment is set to "Anyone" access.<br><br><small>' + e.message + '</small>');
   }
 }
 
-async function loadMore() {
-  if (displayedCount < allEmails.length) {
-    displayedCount = Math.min(displayedCount + PAGE_SIZE, allEmails.length);
-    renderEmails();
-  } else if (nextPageToken) {
-    await loadEmails();
-  } else {
-    document.getElementById('load-more-wrap').style.display = 'none';
-  }
-}
-
-// ── Rendering ─────────────────────────────────────────────────────────────────
-function filtered() {
+// ── Render ────────────────────────────────────────────────────────────────────
+function getFiltered() {
   return allEmails.filter(e => {
-    if (activeType === 'grades'        && !e.isGrade)           return false;
-    if (activeType === 'announcements' && e.isGrade)            return false;
+    if (activeType === 'grades'        && !e.isGrade)              return false;
+    if (activeType === 'announcements' && e.isGrade)               return false;
     if (activeCourse !== 'all'         && e.course !== activeCourse) return false;
     return true;
   });
@@ -414,37 +338,33 @@ function renderFilters() {
 
   document.getElementById('type-filters').innerHTML =
     ['all', 'grades', 'announcements'].map(t =>
-      `<button class="filter-btn${activeType === t ? ' active' : ''}" onclick="setTypeFilter('${t}')">${t}</button>`
+      `<button class="filter-btn${activeType === t ? ' active' : ''}" onclick="setType('${t}')">${t}</button>`
     ).join('');
 
   document.getElementById('course-filters').innerHTML =
     ['all', ...courses].map(c => {
-      const label = c === 'all' ? 'all courses' : c;
-      return `<button class="filter-btn${activeCourse === c ? ' active' : ''}" onclick="setCourseFilter('${CSS.escape(c)}')" data-course="${c}">${label}</button>`;
+      const safe = c.replace(/'/g, "\\'");
+      return `<button class="filter-btn${activeCourse === c ? ' active' : ''}" onclick="setCourse('${safe}')">${c === 'all' ? 'all courses' : c}</button>`;
     }).join('');
 }
 
-function setTypeFilter(t) { activeType = t; renderFilters(); renderEmails(); }
-function setCourseFilter(c) {
-  // data-course preserves original value with spaces
-  activeCourse = c;
-  // Re-read from DOM to get unescaped value
-  document.querySelectorAll('#course-filters [data-course]').forEach(btn => {
-    activeCourse = btn.dataset.course === c ? btn.dataset.course : activeCourse;
-  });
-  renderFilters();
+function setType(t)   { activeType = t;   renderFilters(); renderEmails(); }
+function setCourse(c) { activeCourse = c; renderFilters(); renderEmails(); }
+
+function showMore() {
+  displayed = Math.min(displayed + PAGE, getFiltered().length);
   renderEmails();
 }
 
 function renderEmails() {
-  const feed = document.getElementById('email-feed');
-  const items = filtered().slice(0, displayedCount);
+  const feed  = document.getElementById('email-feed');
+  const items = getFiltered().slice(0, displayed);
+  const all   = getFiltered();
 
-  // Stats
   const unread = allEmails.filter(e => e.isUnread).length;
   const grades = allEmails.filter(e => e.isGrade).length;
   document.getElementById('stats-row').innerHTML =
-    `<span class="stat"><strong>${allEmails.length}</strong> total</span>` +
+    `<span class="stat"><strong>${allEmails.length}</strong> emails</span>` +
     `<span class="stat"><strong>${unread}</strong> unread</span>` +
     `<span class="stat"><strong>${grades}</strong> grade notifications</span>`;
 
@@ -454,60 +374,44 @@ function renderEmails() {
     return;
   }
 
-  // Group into date buckets
   let html = '';
-  let lastDivider = '';
-
+  let lastLabel = '';
   items.forEach(e => {
-    const divider = dividerLabel(e.ts);
-    if (divider !== lastDivider) {
-      html += `<div class="date-divider">${divider}</div>`;
-      lastDivider = divider;
-    }
-    html += renderCard(e);
+    const label = dividerLabel(e.ts);
+    if (label !== lastLabel) { html += `<div class="date-divider">${label}</div>`; lastLabel = label; }
+    html += cardHTML(e);
   });
-
   feed.innerHTML = html;
 
-  // Load more button
-  const hasMore = filtered().length > displayedCount || !!nextPageToken;
-  document.getElementById('load-more-wrap').style.display = hasMore ? 'block' : 'none';
+  document.getElementById('load-more-wrap').style.display = displayed < all.length ? 'block' : 'none';
 }
 
-function renderCard(e) {
+function cardHTML(e) {
   const cc = getCourseColor(e.course);
-  const coursePill = `<span class="course-pill" style="background:${cc.color};color:${cc.text}">${e.course}</span>`;
+  const pill = `<span class="course-pill" style="background:${cc.color};color:${cc.text}">${e.course}</span>`;
 
-  let typeBadge = '';
-  if (e.type === 'grade-changed')     typeBadge = '<span class="type-badge badge-grade">Grade changed</span>';
-  else if (e.type === 'submission-posted') typeBadge = '<span class="type-badge badge-graded">Graded</span>';
-  else if (e.type === 'announcement') typeBadge = '<span class="type-badge badge-announce">Announcement</span>';
+  const badge =
+    e.type === 'grade-changed'      ? '<span class="type-badge badge-grade">Grade changed</span>' :
+    e.type === 'submission-posted'  ? '<span class="type-badge badge-graded">Graded</span>' :
+                                      '<span class="type-badge badge-announce">Announcement</span>';
 
   let body = '';
   if (e.isGrade && e.grade) {
     const g  = e.grade;
     const gs = gradeStyle(g.pct);
-    const scoreStr = Number.isInteger(g.score) ? g.score : g.score.toFixed(1);
-    const totalStr = Number.isInteger(g.total) ? g.total : g.total.toFixed(1);
-    const pctStr   = g.pct !== null ? ` · ${g.pct}%` : '';
+    const sv = Number.isInteger(g.score) ? g.score : g.score.toFixed(1);
+    const tv = Number.isInteger(g.total) ? g.total : g.total.toFixed(1);
     body = `<div class="grade-score" style="background:${gs.bg};color:${gs.text}">
-      <span class="grade-score-val">${scoreStr} / ${totalStr}</span>
-      <span class="grade-score-pct">${pctStr}</span>
+      <span class="grade-score-val">${sv} / ${tv}</span>
+      ${g.pct !== null ? `<span class="grade-score-pct">· ${g.pct}%</span>` : ''}
     </div>`;
-  } else if (!e.isGrade && e.snippet) {
-    // Announcement preview — strip boilerplate Canvas footer
-    const clean = e.snippet
-      .replace(/You received this email because.*$/i, '')
-      .replace(/View announcement.*$/i, '')
-      .replace(/Update your notification.*$/i, '')
-      .trim();
-    if (clean) body = `<div class="email-preview">${clean}</div>`;
+  } else if (e.preview) {
+    body = `<div class="email-preview">${e.preview}</div>`;
   }
 
   return `<a class="email-card${e.isUnread ? ' unread' : ''}" href="${e.gmailUrl}" target="_blank" rel="noopener">
     <div class="email-card-top">
-      ${coursePill}
-      ${typeBadge}
+      ${pill}${badge}
       <div class="email-card-meta">
         <span class="email-date">${formatDate(e.ts)}</span>
         ${e.isUnread ? '<span class="unread-dot"></span>' : ''}
@@ -518,74 +422,74 @@ function renderCard(e) {
   </a>`;
 }
 
+// ── Date helpers ──────────────────────────────────────────────────────────────
+function dividerLabel(ts) {
+  const d = new Date(Number(ts)), now = new Date();
+  const days = Math.floor((now - d) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7)  return 'This week';
+  if (days < 14) return 'Last week';
+  return d.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+}
+
+function formatDate(ts) {
+  const d = new Date(Number(ts)), now = new Date();
+  const days = Math.floor((now - d) / 86400000);
+  if (days === 0) return d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  if (days === 1) return 'Yesterday';
+  if (days < 7)  return d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
 function showLoading() {
   document.getElementById('email-feed').innerHTML =
-    `<p class="state-msg"><span class="loading-dots"><span></span><span></span><span></span></span></p>`;
+    '<p class="state-msg"><span class="loading-dots"><span></span><span></span><span></span></span></p>';
 }
-
 function showError(msg) {
   document.getElementById('email-feed').innerHTML = `<p class="state-msg">${msg}</p>`;
-}
-
-// ── OAuth ─────────────────────────────────────────────────────────────────────
-function onGsiLoad() {
-  if (!CLIENT_ID) return;
-  initTokenClient();
-  if (accessToken) loadEmails();
-  else showAuthButton();
-}
-
-function initTokenClient() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/gmail.readonly',
-    callback: resp => {
-      if (resp.error) { console.error(resp); return; }
-      accessToken = resp.access_token;
-      sessionStorage.setItem('gmail_token', accessToken);
-      document.getElementById('auth-btn').style.display = 'none';
-      loadEmails();
-    },
-  });
-}
-
-function requestToken() {
-  if (!tokenClient) initTokenClient();
-  tokenClient.requestAccessToken();
-}
-
-function handleExpiredToken() {
-  accessToken = '';
-  sessionStorage.removeItem('gmail_token');
-  showAuthButton();
-  showError('Session expired. Click "Connect Gmail" to reconnect.');
-}
-
-function showAuthButton() {
-  document.getElementById('auth-btn').style.display = 'block';
-  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
-function saveClientId() {
-  const val = document.getElementById('client-id-input').value.trim();
-  if (!val) return;
-  CLIENT_ID = val;
-  localStorage.setItem('gmail_client_id', val);
+function saveScriptUrl() {
+  const val = document.getElementById('script-url-input').value.trim();
+  if (!val || !val.includes('script.google.com')) {
+    document.getElementById('script-url-input').style.borderColor = '#ef4444';
+    return;
+  }
+  SCRIPT_URL = val;
+  localStorage.setItem('canvas_script_url', val);
   document.getElementById('setup-screen').style.display = 'none';
-  initTokenClient();
-  showAuthButton();
+  loadEmails();
+}
+
+function resetSetup() {
+  localStorage.removeItem('canvas_script_url');
+  SCRIPT_URL = '';
+  allEmails = [];
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('refresh-btn').style.display  = 'none';
+  document.getElementById('reset-btn').style.display    = 'none';
+  document.getElementById('setup-screen').style.display = 'block';
+}
+
+function copyScript() {
+  const code = document.getElementById('script-code').textContent
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 2000);
+  });
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-document.getElementById('origin-hint').textContent = window.location.origin;
-
-if (!CLIENT_ID) {
-  document.getElementById('setup-screen').style.display = 'block';
+if (SCRIPT_URL) {
+  loadEmails();
 } else {
-  // GIS script will call onGsiLoad() when ready
-  // If GIS already loaded (cached), call manually
-  if (typeof google !== 'undefined' && google.accounts) onGsiLoad();
+  document.getElementById('setup-screen').style.display = 'block';
 }
 </script>
 </body>
