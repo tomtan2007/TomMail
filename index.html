@@ -98,6 +98,7 @@
     .course-row:last-child { border-bottom: none; padding-bottom: 0; }
     .course-name { font-size: 14px; font-weight: 500; }
     .course-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+    .unread-badge { font-size: 10px; font-weight: 500; color: #1e40af; background: #dbeafe; padding: 1px 7px; border-radius: 20px; white-space: nowrap; }
 
     .filter-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
     .filter-btn { font-size: 11px; padding: 3px 10px; border-radius: 20px; border: 0.5px solid var(--border-mid); background: none; color: var(--text-secondary); cursor: pointer; font-family: var(--font); }
@@ -215,6 +216,7 @@ let assignments = [];
 let done     = new Set(JSON.parse(localStorage.getItem('tdone')  || '[]'));
 let manualExams  = JSON.parse(localStorage.getItem('texams') || '[]');
 let activeFilter = 'all';
+let unreadByCourse = {};
 
 const daysUntil = str => Math.round((new Date(str+'T00:00:00') - today) / 86400000);
 
@@ -361,14 +363,77 @@ function renderCourses() {
   document.getElementById('courses-card').innerHTML = Object.entries(COURSE_NAMES).map(([k,v]) => {
     const c = COURSES[k];
     const n = assignments.filter(a=>a.course===k).length;
+    const ur = unreadByCourse[k] || 0;
     return `<div class="course-row">
       <span class="course-name">${v}</span>
       <div style="display:flex;align-items:center;gap:8px;">
+        ${ur > 0 ? `<span class="unread-badge">${ur} unread</span>` : ''}
         <span style="font-size:12px;color:var(--text-tertiary)">${n} upcoming</span>
         <span class="course-tag" style="background:${c.color};color:${c.text}">${k}</span>
       </div>
     </div>`;
   }).join('');
+}
+
+// --- Unread email indicators ---
+function normalizeEmailCourse(from, subject) {
+  const combined = (from + ' ' + subject).toUpperCase();
+  const checks = [
+    ['CHEM 215',    /CHEM(?:ISTRY)?\s*215/],
+    ['PHYSICS 240', /PHYSICS\s*240/],
+    ['ASIAN 325',   /ASIAN\s*325/],
+    ['PSYCH 111',   /PSYCH\s*111/],
+  ];
+  for (const [name, re] of checks) {
+    if (re.test(combined)) return name;
+  }
+  return null;
+}
+
+async function fetchUnreadCounts() {
+  const csvUrl = localStorage.getItem('canvas_csv_url');
+  if (!csvUrl) return;
+  try {
+    const r = await fetch(csvUrl);
+    if (!r.ok) return;
+    const text = await r.text();
+    const rows = parseEmailCSV(text);
+    const counts = {};
+    // rows[0] = header: id,subject,from,date,body,unread
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.length < 6) continue;
+      const isUnread = row[5] === 'TRUE' || row[5] === 'true';
+      if (!isUnread) continue;
+      const course = normalizeEmailCourse(row[2], row[1]);
+      if (course) counts[course] = (counts[course] || 0) + 1;
+    }
+    unreadByCourse = counts;
+    renderCourses();
+  } catch {}
+}
+
+function parseEmailCSV(text) {
+  const rows = []; let row = []; let field = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n' || (c === '\r' && text[i+1] === '\n')) {
+        if (c === '\r') i++;
+        row.push(field); field = '';
+        if (row.length > 1 || row[0] !== '') rows.push(row);
+        row = [];
+      } else field += c;
+    }
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
 }
 
 // --- Assignments ---
@@ -426,6 +491,7 @@ function renderAll() { renderExams(); renderCourses(); renderFilters(); renderAs
 
 document.getElementById('today-str').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 fetchAssignments();
+fetchUnreadCounts();
 </script>
 </body>
 </html>
