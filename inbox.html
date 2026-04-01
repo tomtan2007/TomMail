@@ -118,154 +118,20 @@
   <div id="setup-screen" style="display:none">
     <div class="setup-card">
       <div class="setup-title">One-time setup</div>
-      <div class="setup-sub">An Apps Script syncs your inbox into a Google Sheet with AI classification via Gemini. The sheet is published as CSV for this page to read.</div>
+      <div class="setup-sub">An Apps Script syncs your inbox into a Google Sheet with AI classification. The sheet is published as CSV for this page to read. See <code>inbox_script.js</code> in the repo for the Apps Script code.</div>
 
       <div class="setup-step">
         <div class="step-num">1</div>
-        <div>Get a free Gemini API key from <a class="setup-link" href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.</div>
+        <div>Set up an OpenAI API key and add the code from <code>inbox_script.js</code> to your Apps Script project.</div>
       </div>
 
       <div class="setup-step">
         <div class="step-num">2</div>
-        <div>Create a new Google Sheet (or reuse your Canvas sheet). Copy the <strong>spreadsheet ID</strong> from the URL.</div>
+        <div>Run <code>syncInbox</code> and set a time trigger (every 15 min).</div>
       </div>
 
       <div class="setup-step">
         <div class="step-num">3</div>
-        <div>Open <a class="setup-link" href="https://script.google.com" target="_blank">script.google.com</a> → New project → paste this code. Replace <code>YOUR_SHEET_ID</code> and <code>YOUR_GEMINI_KEY</code>.
-          <div class="code-block" id="script-code">var SHEET_ID = 'YOUR_SHEET_ID';
-var GEMINI_KEY = 'YOUR_GEMINI_KEY';
-
-function syncInbox() {
-  var threads = GmailApp.search(
-    'in:inbox newer_than:14d', 0, 200);
-  var emails = [];
-  for (var i = 0; i &lt; threads.length; i++) {
-    var msgs = threads[i].getMessages();
-    var m = msgs[msgs.length - 1];
-    var body = m.getPlainBody();
-    if (body) body = body.split('________')[0].trim();
-    else body = '';
-    emails.push([
-      m.getId(), m.getSubject(), m.getFrom(),
-      m.getDate().getTime(),
-      body.substring(0, 800), m.isUnread()
-    ]);
-  }
-  emails.sort(function(a, b) { return b[3] - a[3]; });
-  var results = aiProcess(emails);
-  var ss = SpreadsheetApp.openById(SHEET_ID);
-  var sheet = ss.getSheetByName('inbox');
-  if (!sheet) sheet = ss.insertSheet('inbox');
-  sheet.clearContents();
-  sheet.getRange(1,1,1,8).setValues(
-    [['id','subject','from','date','body',
-      'unread','category','summary']]);
-  if (emails.length > 0) {
-    var rows = emails.map(function(e, i) {
-      var r = results[i] || {};
-      return e.concat([
-        r.cat || 'campus', r.sum || ''
-      ]);
-    });
-    sheet.getRange(2,1,rows.length,8)
-      .setValues(rows);
-  }
-}
-
-function gemini(prompt) {
-  var resp = UrlFetchApp.fetch(
-    'https://generativelanguage.googleapis.com'
-    + '/v1beta/models/gemini-2.0-flash'
-    + ':generateContent?key=' + GEMINI_KEY,
-    { method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify({
-        contents: [{parts: [{text: prompt}]}]
-      }),
-      muteHttpExceptions: true });
-  var j = JSON.parse(resp.getContentText());
-  return j.candidates[0].content.parts[0].text;
-}
-
-function aiProcess(emails) {
-  var out = [];
-  var BATCH = 10;
-  for (var i = 0; i &lt; emails.length; i += BATCH) {
-    var batch = emails.slice(i, i + BATCH);
-    var lines = batch.map(function(e, j) {
-      var b = (e[4] || '').substring(0, 200);
-      return (j+1) + '. FROM: ' + e[2]
-        + ' | SUBJ: ' + e[1]
-        + ' | BODY: ' + b;
-    }).join('\n');
-    var prompt = 'You classify and summarize emails '
-      + 'for a UMich BME undergrad.\n\n'
-      + 'For each email reply with exactly one line:\n'
-      + 'NUMBER. CATEGORY | SUMMARY\n\n'
-      + 'Example: 1. lab | PI moved reading group '
-      + 'to Wed 4pm, asking for confirmation.\n\n'
-      + 'Categories:\n'
-      + '- lab: lab PI/members, research\n'
-      + '- dept: BME dept, career, seminars, '
-      + 'thesis defenses, jobs/internships\n'
-      + '- orgs: student organizations, clubs\n'
-      + '- campus: important campus announcements '
-      + 'that need action (registrar, financial '
-      + 'aid, safety, housing, IT)\n'
-      + '- lowpri: mass emails, surveys, voting, '
-      + 'newsletters, promos, events student '
-      + 'likely wont attend, MCTP, department '
-      + 'blasts, storage, Lyft, recruitment\n\n'
-      + 'Summary rules:\n'
-      + '- 1 sentence, max 20 words\n'
-      + '- Focus on what matters: action needed, '
-      + 'key info, deadline\n'
-      + '- Skip greetings and filler\n'
-      + '- When in doubt classify as lowpri\n\n'
-      + 'Emails:\n' + lines;
-    try {
-      var text = gemini(prompt);
-      var valid = ['lab','dept','orgs',
-        'campus','lowpri'];
-      text.split('\n').forEach(function(line) {
-        var m = line.match(
-          /^(\d+)\.\s*(\w+)\s*\|\s*(.+)/);
-        if (m) {
-          var idx = parseInt(m[1]) - 1;
-          var c = m[2].toLowerCase();
-          if (valid.indexOf(c) &lt; 0) c = 'campus';
-          if (!out[i + idx]) out[i + idx] = {};
-          out[i + idx] = {
-            cat: c,
-            sum: m[3].trim().substring(0, 150)
-          };
-        }
-      });
-      for (var j = 0; j &lt; batch.length; j++) {
-        if (!out[i + j]) out[i + j] = {
-          cat: 'campus', sum: '' };
-      }
-    } catch(err) {
-      for (var j = 0; j &lt; batch.length; j++) {
-        if (!out[i + j]) out[i + j] = {
-          cat: 'campus', sum: '' };
-      }
-    }
-  }
-  return out;
-}</div>
-          <div class="copy-row"><button class="copy-btn" id="copy-btn" onclick="copyScript()">copy code</button></div>
-        </div>
-      </div>
-
-      <div class="setup-step">
-        <div class="step-num">4</div>
-        <div>Click ▶ <strong>Run</strong>, authorize when prompted. Then set up a <strong>time trigger</strong> (clock icon → Add Trigger → <code>syncInbox</code> → every 15 min).</div>
-      </div>
-
-      <div class="setup-step">
-        <div class="step-num">5</div>
         <div>In the Sheet: <strong>File → Share → Publish to web</strong> → select the <strong>inbox</strong> sheet → <strong>CSV</strong> → Publish. Copy the URL.</div>
       </div>
 
@@ -281,25 +147,16 @@ function aiProcess(emails) {
 
   <!-- Main -->
   <div id="main-content" style="display:none">
-    <div class="filter-section">
-      <div class="filter-row" id="cat-filters"></div>
-    </div>
     <div id="stats-row" class="stats-row"></div>
+    <div class="filter-section">
+      <div class="filter-row" id="main-filters"></div>
+    </div>
     <div id="email-feed" class="email-feed"></div>
     <div class="load-more-wrap" id="load-more-wrap" style="display:none">
       <button class="btn" onclick="showMore()">Show more</button>
     </div>
-    <!-- Low priority section -->
-    <div id="lowpri-section" style="display:none">
-      <div class="section-divider">
-        <span id="lowpri-label">Low Priority</span>
-        <button class="toggle-btn" id="lowpri-toggle" onclick="toggleLowPri()">Show all</button>
-      </div>
-      <div id="lowpri-feed" class="email-feed" style="display:none"></div>
-      <div class="load-more-wrap" id="lowpri-load-more" style="display:none">
-        <button class="btn" onclick="showMoreLowPri()">Show more</button>
-      </div>
-    </div>
+    <!-- Subcategory sections -->
+    <div id="subcategories"></div>
   </div>
 
 </div>
@@ -308,16 +165,26 @@ let CSV_URL   = localStorage.getItem('inbox_csv_url') || '';
 let allEmails = [];
 let displayed = 0;
 const PAGE    = 40;
-let activeCat = 'all';
+let activeMain = 'all';
 
 // ── Categories ────────────────────────────────────────────────────────────────
 const CATEGORIES = {
+  important: { label: 'Important',       color: '#dbeafe', text: '#1e40af' },
   lab:       { label: 'Lab & Research',  color: '#dbeafe', text: '#1e40af' },
   dept:      { label: 'BME & Career',    color: '#ede9fe', text: '#5b21b6' },
   orgs:      { label: 'Student Orgs',    color: '#fef3c7', text: '#92400e' },
   campus:    { label: 'Campus',          color: '#e0f2fe', text: '#0c4a6e' },
+  promo:     { label: 'Promotions',      color: '#fce7f3', text: '#9d174d' },
   lowpri:    { label: 'Low Priority',    color: '#f1f0eb', text: '#9b9b97' },
 };
+
+// Categories that show in the main inbox feed
+const MAIN_CATS = new Set(['important']);
+// Categories that show as collapsible subcategories below
+const SUB_CATS = ['lab', 'dept', 'orgs', 'campus', 'promo', 'lowpri'];
+// Track open/closed state per subcategory
+const subOpen = {};
+const subDisplayed = {};
 
 // Sender-based classification rules (checked in order, first match wins)
 const RULES = [
@@ -474,7 +341,7 @@ function parseEmail(r) {
   const body    = r[4] || '';
   // Use AI category from column 7 if available, otherwise fall back to regex
   const aiCat   = (r[6] || '').trim().toLowerCase();
-  const validCats = ['lab','dept','orgs','campus','lowpri','_skip'];
+  const validCats = ['important','lab','dept','orgs','campus','promo','lowpri','_skip'];
   const cat     = validCats.includes(aiCat) ? aiCat : classify(from, subject);
   const event   = (cat !== 'lowpri') ? detectEvent(subject, body) : null;
 
@@ -498,14 +365,11 @@ function parseEmail(r) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let primaryEmails = [];
-let lowPriEmails  = [];
-let lowPriOpen    = false;
-let lowPriDisplayed = 0;
+let mainEmails = [];
 
 // ── Load ─────────────────────────────────────────────────────────────────────
 async function loadEmails() {
-  allEmails = []; primaryEmails = []; lowPriEmails = [];
+  allEmails = []; mainEmails = [];
   document.getElementById('main-content').style.display = 'block';
   showLoading();
   try {
@@ -519,14 +383,13 @@ async function loadEmails() {
       .map(parseEmail)
       .filter(e => e.cat !== '_skip')
       .sort((a, b) => b.ts - a.ts);
-    primaryEmails = allEmails.filter(e => e.cat !== 'lowpri');
-    lowPriEmails  = allEmails.filter(e => e.cat === 'lowpri');
-    displayed = Math.min(PAGE, primaryEmails.length);
-    lowPriDisplayed = Math.min(PAGE, lowPriEmails.length);
+    mainEmails = allEmails.filter(e => MAIN_CATS.has(e.cat));
+    displayed = Math.min(PAGE, mainEmails.length);
     document.getElementById('refresh-btn').style.display = 'block';
-    renderFilters();
+    renderStats();
+    renderMainFilters();
     renderEmails();
-    renderLowPri();
+    renderSubcategories();
   } catch (e) {
     showError(e.message);
   } finally {
@@ -534,52 +397,42 @@ async function loadEmails() {
   }
 }
 
-// ── Render ───────────────────────────────────────────────────────────────────
-function getFiltered() {
-  if (activeCat === 'all') return primaryEmails;
-  if (activeCat === 'unread') return primaryEmails.filter(e => e.isUnread);
-  return primaryEmails.filter(e => e.cat === activeCat);
+// ── Main inbox ──────────────────────────────────────────────────────────────
+function getMainFiltered() {
+  if (activeMain === 'all') return mainEmails;
+  if (activeMain === 'unread') return mainEmails.filter(e => e.isUnread);
+  return mainEmails;
 }
 
-function renderFilters() {
-  const unreadCounts = {};
-  const hasCat = {};
-  primaryEmails.forEach(e => {
-    hasCat[e.cat] = true;
-    if (e.isUnread) unreadCounts[e.cat] = (unreadCounts[e.cat] || 0) + 1;
-  });
-  const totalUnread = primaryEmails.filter(e => e.isUnread).length;
+function renderStats() {
+  const mainUnread = mainEmails.filter(e => e.isUnread).length;
+  const totalOther = allEmails.length - mainEmails.length;
+  document.getElementById('stats-row').innerHTML =
+    `<span class="stat"><strong>${mainEmails.length}</strong> important</span>` +
+    `<span class="stat"><strong>${mainUnread}</strong> unread</span>` +
+    `<span class="stat" style="opacity:0.5"><strong>${totalOther}</strong> in subcategories</span>`;
+}
 
+function renderMainFilters() {
+  const unread = mainEmails.filter(e => e.isUnread).length;
   const pills = [
-    { key: 'all', label: 'All', count: totalUnread },
-    { key: 'unread', label: 'Unread', count: totalUnread },
+    { key: 'all', label: 'All', count: mainEmails.length },
+    { key: 'unread', label: 'Unread', count: unread },
   ];
-  for (const [key, meta] of Object.entries(CATEGORIES)) {
-    if (key === 'lowpri') continue;
-    if (hasCat[key]) pills.push({ key, label: meta.label, count: unreadCounts[key] || 0 });
-  }
-
-  document.getElementById('cat-filters').innerHTML = pills.map(p =>
-    `<button class="filter-btn${activeCat===p.key?' active':''}" onclick="setCat('${p.key}')">${p.label}${p.count ? ' <span class="filter-count">' + p.count + '</span>' : ''}</button>`
+  document.getElementById('main-filters').innerHTML = pills.map(p =>
+    `<button class="filter-btn${activeMain===p.key?' active':''}" onclick="setMain('${p.key}')">${p.label}${p.count ? ' <span class="filter-count">' + p.count + '</span>' : ''}</button>`
   ).join('');
 }
 
-function setCat(c) { activeCat = c; renderFilters(); renderEmails(); }
-function showMore() { displayed = Math.min(displayed + PAGE, getFiltered().length); renderEmails(); }
-function showMoreLowPri() { lowPriDisplayed = Math.min(lowPriDisplayed + PAGE, lowPriEmails.length); renderLowPri(); }
+function setMain(c) { activeMain = c; renderMainFilters(); renderEmails(); }
+function showMore() { displayed = Math.min(displayed + PAGE, getMainFiltered().length); renderEmails(); }
 
 function renderEmails() {
   const feed  = document.getElementById('email-feed');
-  const items = getFiltered().slice(0, displayed);
-
-  const unread = primaryEmails.filter(e => e.isUnread).length;
-  document.getElementById('stats-row').innerHTML =
-    `<span class="stat"><strong>${primaryEmails.length}</strong> emails</span>` +
-    `<span class="stat"><strong>${unread}</strong> unread</span>` +
-    `<span class="stat" style="opacity:0.5"><strong>${lowPriEmails.length}</strong> low priority</span>`;
+  const items = getMainFiltered().slice(0, displayed);
 
   if (!items.length) {
-    feed.innerHTML = '<p class="state-msg">No emails match this filter.</p>';
+    feed.innerHTML = '<p class="state-msg">No important emails right now.</p>';
     document.getElementById('load-more-wrap').style.display = 'none';
     return;
   }
@@ -591,29 +444,45 @@ function renderEmails() {
     html += cardHTML(e);
   });
   feed.innerHTML = html;
-  document.getElementById('load-more-wrap').style.display = displayed < getFiltered().length ? 'block' : 'none';
+  document.getElementById('load-more-wrap').style.display = displayed < getMainFiltered().length ? 'block' : 'none';
 }
 
-function toggleLowPri() {
-  lowPriOpen = !lowPriOpen;
-  document.getElementById('lowpri-feed').style.display = lowPriOpen ? 'flex' : 'none';
-  document.getElementById('lowpri-toggle').textContent = lowPriOpen ? 'Hide' : 'Show all';
-  if (lowPriOpen) renderLowPri();
-}
-
-function renderLowPri() {
-  const section = document.getElementById('lowpri-section');
-  if (!lowPriEmails.length) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  const unread = lowPriEmails.filter(e => e.isUnread).length;
-  document.getElementById('lowpri-label').textContent = `Low Priority · ${lowPriEmails.length}${unread ? ` (${unread} unread)` : ''}`;
-  if (!lowPriOpen) return;
-
-  const items = lowPriEmails.slice(0, lowPriDisplayed);
+// ── Subcategories ───────────────────────────────────────────────────────────
+function renderSubcategories() {
+  const container = document.getElementById('subcategories');
   let html = '';
-  items.forEach(e => { html += cardHTML(e); });
-  document.getElementById('lowpri-feed').innerHTML = html;
-  document.getElementById('lowpri-load-more').style.display = lowPriDisplayed < lowPriEmails.length ? 'block' : 'none';
+  for (const catKey of SUB_CATS) {
+    const emails = allEmails.filter(e => e.cat === catKey);
+    if (!emails.length) continue;
+    const meta = CATEGORIES[catKey];
+    const unread = emails.filter(e => e.isUnread).length;
+    const isOpen = subOpen[catKey] || false;
+    subDisplayed[catKey] = subDisplayed[catKey] || Math.min(PAGE, emails.length);
+
+    html += `<div class="section-divider">
+      <span><span class="cat-pill" style="background:${meta.color};color:${meta.text}">${meta.label}</span> · ${emails.length}${unread ? ' <span style="color:var(--text)">' + unread + ' unread</span>' : ''}</span>
+      <button class="toggle-btn" onclick="toggleSub('${catKey}')">${isOpen ? 'Hide' : 'Show'}</button>
+    </div>`;
+    if (isOpen) {
+      html += '<div class="email-feed" style="margin-bottom:8px">';
+      emails.slice(0, subDisplayed[catKey]).forEach(e => { html += cardHTML(e); });
+      html += '</div>';
+      if (subDisplayed[catKey] < emails.length) {
+        html += `<div class="load-more-wrap"><button class="btn" onclick="showMoreSub('${catKey}')">Show more</button></div>`;
+      }
+    }
+  }
+  container.innerHTML = html;
+}
+
+function toggleSub(key) {
+  subOpen[key] = !subOpen[key];
+  renderSubcategories();
+}
+function showMoreSub(key) {
+  const emails = allEmails.filter(e => e.cat === key);
+  subDisplayed[key] = Math.min((subDisplayed[key] || PAGE) + PAGE, emails.length);
+  renderSubcategories();
 }
 
 function cardHTML(e) {

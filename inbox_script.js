@@ -115,22 +115,25 @@ function aiProcess(emails) {
     var prompt = 'You classify and summarize emails for a UMich BME undergrad.\n\n'
       + 'For each email reply with exactly one line:\n'
       + 'NUMBER. CATEGORY | SUMMARY\n\n'
-      + 'Example: 1. lab | PI moved reading group to Wed 4pm, asking for confirmation.\n\n'
-      + 'Categories:\n'
-      + '- lab: lab PI/members, research\n'
-      + '- dept: BME dept, career, seminars, thesis defenses, jobs/internships\n'
-      + '- orgs: student organizations, clubs\n'
-      + '- campus: important campus announcements that need action (registrar, financial aid, safety, housing, IT)\n'
-      + '- lowpri: mass emails, surveys, voting, newsletters, promos, events student likely wont attend, MCTP, department blasts, storage, Lyft, recruitment\n\n'
-      + 'Summary rules:\n'
-      + '- 1 sentence, max 20 words\n'
-      + '- Focus on what matters: action needed, key info, deadline\n'
-      + '- Skip greetings and filler\n'
-      + '- When in doubt classify as lowpri\n\n'
+      + 'Example: 1. important | Dr. Douville sent anesthesia tech details, needs response by Friday.\n\n'
+      + 'Categories (pick ONE):\n'
+      + '- important: emails directed personally to the student that need attention — direct messages from professors, advisors, or contacts; registrar actions; financial aid; personal requests; deadlines requiring action. The key test: is this sent TO the student specifically, not to a mailing list?\n'
+      + '- lab: lab PI/members, research group emails, lab meetings, reading groups\n'
+      + '- dept: BME department blasts, seminar series, thesis defenses, career services, job postings\n'
+      + '- orgs: student organizations, clubs, org newsletters\n'
+      + '- campus: campus-wide announcements, safety alerts, IT notices, housing, dining\n'
+      + '- promo: promotional emails, commercial services, companies, apps, subscriptions\n'
+      + '- lowpri: surveys, voting, mass newsletters, events student likely wont attend, MCTP events, storage reminders, study recruitment, generic department blasts\n\n'
+      + 'Key rules:\n'
+      + '- If the email is from a person writing directly to the student (not a mailing list or automated), classify as important\n'
+      + '- If the email is a mass send / mailing list / automated notification, it is NOT important — use the appropriate other category\n'
+      + '- BME seminar series, lab equipment notices (like Rogel room updates), reading group schedules = lab or dept, NOT important\n'
+      + '- When in doubt between important and another category, pick the other category\n\n'
+      + 'Summary: 1 sentence, max 20 words. Focus on action needed or key info.\n\n'
       + 'Emails:\n' + lines;
     try {
       var text = aiCall(prompt);
-      var valid = ['lab', 'dept', 'orgs', 'campus', 'lowpri'];
+      var valid = ['important', 'lab', 'dept', 'orgs', 'campus', 'promo', 'lowpri'];
       text.split('\n').forEach(function(line) {
         var m = line.match(/^(\d+)\.\s*(\w+)\s*\|\s*(.+)/);
         if (m) {
