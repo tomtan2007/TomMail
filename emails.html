@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Canvas Emails — Tom's Dashboard</title>
+  <title>Course Emails — Tom's Dashboard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -113,7 +113,7 @@
   <div class="header">
     <div class="header-left">
       <a href="index.html" class="back-link">← Dashboard</a>
-      <span class="greeting">Canvas Emails</span>
+      <span class="greeting">Course Emails</span>
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
       <button id="refresh-btn" class="btn btn-sm" style="display:none" onclick="loadEmails()">↻ Refresh</button>
@@ -136,7 +136,9 @@
         <div class="step-num">2</div>
         <div>Open <a class="setup-link" href="https://script.google.com" target="_blank">script.google.com</a>, click <strong>New project</strong>, and paste the code below. Replace <code>YOUR_SHEET_ID</code> with the ID you copied.
           <div class="code-block" id="script-code">function syncEmails() {
-  var threads = GmailApp.search('from:instructure.com', 0, 50);
+  var threads = GmailApp.search(
+    'from:instructure.com OR from:gradescope.com OR from:perusall.com',
+    0, 100);
   var emails = [];
   for (var i = 0; i &lt; threads.length; i++) {
     var msgs = threads[i].getMessages();
@@ -237,10 +239,10 @@ function normalizeCourse(fromName, subject) {
   const checks = [
     ['CHEM 216',    /CHEM(?:ISTRY)?\s*216/],
     ['CHEM 215',    /CHEM(?:ISTRY)?\s*215/],
-    ['PHYSICS 241', /PHYSICS\s*241/],
-    ['PHYSICS 240', /PHYSICS\s*240/],
+    ['PHYSICS 241', /PHYS(?:ICS)?\s*241/],
+    ['PHYSICS 240', /PHYS(?:ICS)?\s*240/],
     ['ASIAN 325',   /ASIAN\s*325/],
-    ['PSYCH 111',   /PSYCH\s*111/],
+    ['PSYCH 111',   /PSYCH(?:OLOGY)?\s*111/],
   ];
   for (const [name, re] of checks) {
     if (re.test(combined)) return name;
@@ -275,9 +277,16 @@ function parseCSV(text) {
 }
 
 // ── Email parsing ─────────────────────────────────────────────────────────────
-function parseType(subject) {
+function parseType(subject, from) {
   if (/^(grade changed|submission posted|assignment graded):/i.test(subject)) return 'grade';
+  if (/gradescope/i.test(from) && /grade|score|regrade/i.test(subject)) return 'grade';
   return 'announcement';
+}
+
+function detectSource(from) {
+  if (/gradescope\.com/i.test(from)) return 'Gradescope';
+  if (/perusall\.com/i.test(from)) return 'Perusall';
+  return 'Canvas';
 }
 function extractAssignment(subject) {
   let s = subject.replace(/^(grade changed|submission posted|assignment graded):\s*/i, '').trim();
@@ -303,7 +312,8 @@ function gradeStyle(pct) {
 function parseEmail(raw) {
   const fromRaw = raw.from.split('<')[0].trim();
   const course  = normalizeCourse(fromRaw, raw.subject);
-  const type    = parseType(raw.subject);
+  const source  = detectSource(raw.from);
+  const type    = parseType(raw.subject, raw.from);
   const isGrade = type === 'grade';
   const grade   = isGrade ? parseGrade(raw.body) : null;
   const title   = isGrade ? extractAssignment(raw.subject) : extractTitle(raw.subject, fromRaw);
@@ -312,7 +322,7 @@ function parseEmail(raw) {
     .replace(/\[([^\]]+)\]\s*\([^)]*\)/g, '$1')
     .replace(/\r?\n{3,}/g, '\n\n')
     .trim().substring(0, 220);
-  return {id: raw.id, course, type, isGrade, title: title||raw.subject, preview, grade,
+  return {id: raw.id, course, source, type, isGrade, title: title||raw.subject, preview, grade,
     isUnread: raw.unread, ts: raw.date,
     gmailUrl: 'https://mail.google.com/mail/u/0/#all/' + raw.id};
 }
@@ -403,6 +413,7 @@ function cardHTML(e) {
   const badge = e.isGrade
     ? '<span class="type-badge badge-grade">Grade</span>'
     : '<span class="type-badge badge-announce">Announcement</span>';
+  const srcTag = e.source !== 'Canvas' ? `<span class="type-badge badge-announce">${e.source}</span>` : '';
   let body = '';
   if (e.isGrade && e.grade) {
     const g=e.grade, gs=gradeStyle(g.pct);
@@ -416,7 +427,7 @@ function cardHTML(e) {
     body=`<div class="email-preview">${e.preview}</div>`;
   }
   return `<a class="email-card${e.isUnread?' unread':''}" href="${e.gmailUrl}" target="_blank" rel="noopener">
-    <div class="email-card-top">${pill}${badge}
+    <div class="email-card-top">${pill}${badge}${srcTag}
       <div class="email-card-meta">
         <span class="email-date">${formatDate(e.ts)}</span>
         ${e.isUnread?'<span class="unread-dot"></span>':''}
