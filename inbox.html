@@ -82,9 +82,9 @@
     .email-preview { font-size: 12px; color: var(--text-secondary); line-height: 1.45; }
 
     /* Inline calendar hint */
-    .cal-hint { font-size: 11px; color: var(--text-tertiary); display: inline; }
-    .cal-hint a { color: var(--text-tertiary); text-decoration: none; }
-    .cal-hint a:hover { color: var(--text-secondary); text-decoration: underline; }
+    .cal-hint { font-size: 10px; color: var(--text-tertiary); display: inline; }
+    .cal-hint a { color: var(--text-tertiary) !important; text-decoration: none !important; font-weight: normal; }
+    .cal-hint a:hover { color: var(--text-secondary) !important; }
 
     /* Low-pri section */
     .section-divider { font-size: 13px; font-weight: 500; color: var(--text-tertiary); padding: 24px 0 10px; border-top: 0.5px solid var(--border); margin-top: 20px; display: flex; align-items: center; justify-content: space-between; }
@@ -301,19 +301,24 @@ function senderName(from) {
 }
 
 // ── Event detection ──────────────────────────────────────────────────────────
-const MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|may|june|july|august|september|october|november|december';
+// Only match written-out month names (not numeric m/d patterns which cause false positives)
+const MONTHS = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
 const DATE_RE = new RegExp(
-  '(?:(?:' + MONTHS + ')\\w*\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:[,\\s]+\\d{4})?|\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?)',
+  '(?:' + MONTHS + ')\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:[,\\s]+\\d{4})?',
   'gi'
 );
 const TIME_RE = /\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm))?/gi;
 
+// Keywords that suggest the email is about an event
+const EVENT_KEYWORDS = /\b(rsvp|register|attend|workshop|seminar|meeting|event|session|deadline|due|reminder|defense|presentation|talk|lecture|info\s*session)\b/i;
+
 function detectEvent(subject, body) {
-  const text = subject + ' ' + body;
+  // Only look in the subject — body dates are usually signatures, timestamps, etc.
+  const text = subject;
+  if (!EVENT_KEYWORDS.test(subject + ' ' + body.substring(0, 300))) return null;
   const dates = text.match(DATE_RE);
   const times = text.match(TIME_RE);
   if (!dates || dates.length === 0) return null;
-  // Pick the first date that looks like a future event
   return { date: dates[0].trim(), time: times ? times[0].trim() : null };
 }
 
