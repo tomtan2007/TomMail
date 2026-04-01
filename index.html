@@ -202,7 +202,7 @@
 </div>
 
 <script>
-const ICAL = 'https://umich.instructure.com/feeds/calendars/user_QWg4huzUeUvgRILDMViiMXV0kkeRaL0GbsueXqsd.ics';
+const ASSIGNMENTS_CSV = localStorage.getItem('assignments_csv_url') || '';
 const COURSES = {
   'PHYSICS 240': {color:'#dbeafe',text:'#1e40af'},
   'ASIAN 325':   {color:'#ede9fe',text:'#5b21b6'},
@@ -261,8 +261,31 @@ function parseICS(text) {
   return out.sort((a,b) => new Date(a.due)-new Date(b.due));
 }
 
+function parseAssignmentCSV(text) {
+  const rows = []; let row = []; let field = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n' || (c === '\r' && text[i+1] === '\n')) {
+        if (c === '\r') i++;
+        row.push(field); field = '';
+        if (row.length > 1 || row[0] !== '') rows.push(row);
+        row = [];
+      } else field += c;
+    }
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
 async function fetchAssignments() {
-  // Load cached data instantly so the page renders right away
+  // Show cached data instantly
   const cached = localStorage.getItem('tcached');
   if (cached) {
     try {
@@ -271,37 +294,34 @@ async function fetchAssignments() {
     } catch {}
   }
 
-  document.getElementById('last-updated').textContent = 'Syncing with Canvas...';
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(ICAL)}`, {signal: controller.signal});
-    clearTimeout(timeout);
-    const d = await r.json();
-    assignments = parseICS(d.contents);
-    localStorage.setItem('tcached', JSON.stringify(assignments));
-    document.getElementById('last-updated').textContent = 'Synced from Canvas · ' + new Date().toLocaleTimeString();
-  } catch {
-    if (!assignments.length) {
-      assignments = [
-        {title:'DogenTeaandRice',course:'ASIAN 325',due:'2026-03-31',type:'reading'},
-        {title:'ZenBuddhism',course:'ASIAN 325',due:'2026-03-31',type:'reading'},
-        {title:'Critical Term 8',course:'ASIAN 325',due:'2026-04-01',type:'writing'},
-        {title:'Checkpoint 11',course:'CHEM 215',due:'2026-04-03',type:'checkpoint'},
-        {title:'Essay Assignment #2',course:'PSYCH 111',due:'2026-04-06',type:'essay'},
-        {title:'Bodiford - Zen Funerals',course:'ASIAN 325',due:'2026-04-07',type:'reading'},
-        {title:'soundofonehand',course:'ASIAN 325',due:'2026-04-07',type:'reading'},
-        {title:'Checkpoint 12',course:'CHEM 215',due:'2026-04-10',type:'checkpoint'},
-        {title:'BuswellTracing',course:'ASIAN 325',due:'2026-04-14',type:'reading'},
-        {title:'Watts - Beat Zen',course:'ASIAN 325',due:'2026-04-14',type:'reading'},
-        {title:'Exam 3',course:'CHEM 215',due:'2026-04-14',type:'exam'},
-        {title:'Checkpoint 13',course:'CHEM 215',due:'2026-04-17',type:'checkpoint'},
-        {title:'Final Exam',course:'CHEM 215',due:'2026-04-23',type:'exam'},
-      ];
+  if (!ASSIGNMENTS_CSV) {
+    // Prompt for URL if not set
+    const url = prompt('Paste your published Google Sheet CSV URL for the assignments tab:');
+    if (url && url.includes('docs.google.com')) {
+      localStorage.setItem('assignments_csv_url', url);
+      location.reload();
     }
+    return;
+  }
+
+  document.getElementById('last-updated').textContent = 'Syncing...';
+  try {
+    const r = await fetch(ASSIGNMENTS_CSV);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    const rows = parseAssignmentCSV(text);
+    if (rows.length < 2) throw new Error('Empty sheet');
+    assignments = rows.slice(1)
+      .filter(r => r.length >= 4 && r[2])
+      .map(r => ({ title: r[0], course: r[1], due: r[2], type: r[3] }))
+      .filter(a => daysUntil(a.due) >= -1)
+      .sort((a, b) => new Date(a.due) - new Date(b.due));
+    localStorage.setItem('tcached', JSON.stringify(assignments));
+    document.getElementById('last-updated').textContent = 'Synced · ' + new Date().toLocaleTimeString();
+  } catch {
     document.getElementById('last-updated').textContent = cached
-      ? 'Could not sync · showing cached data'
-      : 'Could not sync · showing fallback data';
+      ? 'Using cached data'
+      : 'Could not load assignments';
   }
   renderAll();
 }
