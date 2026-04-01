@@ -13,7 +13,7 @@ function syncInbox() {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] && data[i][6]) {
-      existing[data[i][0]] = { cat: data[i][6], sum: data[i][7] || '' };
+      existing[data[i][0]] = { cat: data[i][6], sum: data[i][7] || '', evt: data[i][8] || '' };
     }
   }
 
@@ -55,27 +55,28 @@ function syncInbox() {
   for (var i = 0; i < emails.length; i++) {
     var e = emails[i];
     var id = e[0];
-    var cat, sum;
+    var cat, sum, evt;
     if (existing[id]) {
-      // Reuse existing classification, but update unread status
       cat = existing[id].cat;
       sum = existing[id].sum;
+      evt = existing[id].evt;
     } else {
       var r = newResults[newIdx] || {};
       cat = r.cat || 'campus';
       sum = r.sum || '';
+      evt = r.evt || '';
       newIdx++;
     }
-    rows.push(e.concat([cat, sum]));
+    rows.push(e.concat([cat, sum, evt]));
   }
 
   // Write to sheet
   sheet.clearContents();
-  sheet.getRange(1, 1, 1, 8).setValues(
-    [['id', 'subject', 'from', 'date', 'body', 'unread', 'category', 'summary']]
+  sheet.getRange(1, 1, 1, 9).setValues(
+    [['id', 'subject', 'from', 'date', 'body', 'unread', 'category', 'summary', 'event_dt']]
   );
   if (rows.length > 0) {
-    sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+    sheet.getRange(2, 1, rows.length, 9).setValues(rows);
   }
 }
 
@@ -114,8 +115,9 @@ function aiProcess(emails) {
     }).join('\n');
     var prompt = 'You classify and summarize emails for a UMich BME undergrad.\n\n'
       + 'For each email reply with exactly one line:\n'
-      + 'NUMBER. CATEGORY | SUMMARY\n\n'
-      + 'Example: 1. important | Dr. Douville sent anesthesia tech details, needs response by Friday.\n\n'
+      + 'NUMBER. CATEGORY | SUMMARY | EVENT_DATETIME\n\n'
+      + 'Example: 1. important | Dr. Douville sent anesthesia tech details, needs response by Friday. | 2026-04-10 14:00\n'
+      + 'Example with no event: 2. campus | IT maintenance scheduled for tonight. | none\n\n'
       + 'Categories (pick ONE):\n'
       + '- important: emails directed personally to the student that need attention — direct messages from professors, advisors, or contacts; registrar actions; financial aid; personal requests; deadlines requiring action. The key test: is this sent TO the student specifically, not to a mailing list?\n'
       + '- lab: lab PI/members, research group emails, lab meetings, reading groups\n'
@@ -130,26 +132,35 @@ function aiProcess(emails) {
       + '- BME seminar series, lab equipment notices (like Rogel room updates), reading group schedules = lab or dept, NOT important\n'
       + '- When in doubt between important and another category, pick the other category\n\n'
       + 'Summary: 1 sentence, max 20 words. Focus on action needed or key info.\n\n'
+      + 'EVENT_DATETIME rules:\n'
+      + '- If the email mentions a specific event, meeting, seminar, deadline, or appointment with a date (and optionally time), extract it as YYYY-MM-DD HH:MM (24h format)\n'
+      + '- If only a date is mentioned with no time, use YYYY-MM-DD\n'
+      + '- If relative dates like "this Thursday" or "tomorrow" are used, convert to absolute dates (today is ' + Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd') + ')\n'
+      + '- If no event/meeting/deadline date is found, write "none"\n'
+      + '- Only extract dates for actual events/deadlines, NOT the email send date\n\n'
       + 'Emails:\n' + lines;
     try {
       var text = aiCall(prompt);
       var valid = ['important', 'lab', 'dept', 'orgs', 'campus', 'promo', 'lowpri'];
       text.split('\n').forEach(function(line) {
-        var m = line.match(/^(\d+)\.\s*(\w+)\s*\|\s*(.+)/);
+        var m = line.match(/^(\d+)\.\s*(\w+)\s*\|\s*([^|]+?)(?:\s*\|\s*(.+))?$/);
         if (m) {
           var idx = parseInt(m[1]) - 1;
           var c = m[2].toLowerCase();
           if (valid.indexOf(c) < 0) c = 'campus';
-          out[i + idx] = { cat: c, sum: m[3].trim().substring(0, 150) };
+          var evt = (m[4] || '').trim().toLowerCase();
+          if (evt === 'none' || evt === '') evt = '';
+          else evt = (m[4] || '').trim();
+          out[i + idx] = { cat: c, sum: m[3].trim().substring(0, 150), evt: evt };
         }
       });
       for (var j = 0; j < batch.length; j++) {
-        if (!out[i + j]) out[i + j] = { cat: 'campus', sum: '' };
+        if (!out[i + j]) out[i + j] = { cat: 'campus', sum: '', evt: '' };
       }
     } catch (err) {
       Logger.log('AI error: ' + err);
       for (var j = 0; j < batch.length; j++) {
-        if (!out[i + j]) out[i + j] = { cat: 'campus', sum: '' };
+        if (!out[i + j]) out[i + j] = { cat: 'campus', sum: '', evt: '' };
       }
     }
   }

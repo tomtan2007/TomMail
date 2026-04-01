@@ -264,39 +264,31 @@ function senderName(from) {
   return n.trim() || from.match(/<(.+?)>/)?.[1] || from;
 }
 
-// ── Event detection ──────────────────────────────────────────────────────────
-const MONTHS = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
-const DATE_RE = new RegExp(
-  '(?:' + MONTHS + ')\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:[,\\s]+\\d{4})?',
-  'gi'
-);
-const TIME_RE = /\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm))?/gi;
-
-function detectEvent(subject, body) {
-  // First try subject only (most reliable)
-  let dates = subject.match(DATE_RE);
-  let times = subject.match(TIME_RE);
-  if (dates && times) return { date: dates[0].trim(), time: times[0].trim() };
-
-  // Then try body — but only the first 400 chars (before signatures/footers)
-  // and require BOTH a date and time near each other
-  const bodyTop = (body || '').substring(0, 400);
-  dates = bodyTop.match(DATE_RE);
-  times = bodyTop.match(TIME_RE);
-  if (!dates || !times) return null;
-
-  // Check that date and time are close together in the text (within 40 chars)
-  const dIdx = bodyTop.search(DATE_RE);
-  const tIdx = bodyTop.search(TIME_RE);
-  if (Math.abs(dIdx - tIdx) > 40) return null;
-
-  return { date: dates[0].trim(), time: times[0].trim() };
+// ── Event detection (AI-powered via column 9) ──────────────────────────────
+function parseEventDt(raw) {
+  if (!raw || raw === 'none') return null;
+  const m = raw.match(/(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}))?/);
+  if (!m) return null;
+  const d = new Date(m[1] + 'T' + (m[2] || '00:00') + ':00');
+  if (isNaN(d)) return null;
+  const opts = { month: 'short', day: 'numeric' };
+  let display = d.toLocaleDateString('en-US', opts);
+  if (m[2]) {
+    const h = d.getHours(), min = d.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    display += ' ' + h12 + (min ? ':' + String(min).padStart(2,'0') : '') + ' ' + ampm;
+  }
+  return { display, iso: m[1] + 'T' + (m[2] || '12:00') + ':00' };
 }
 
 function calendarLink(subject, event) {
   const title = encodeURIComponent(subject);
-  const when  = encodeURIComponent((event.date || '') + (event.time ? ' ' + event.time : ''));
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${when}`;
+  const dt = new Date(event.iso);
+  const fmt = d => d.toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  const start = fmt(dt);
+  const end = fmt(new Date(dt.getTime() + 3600000));
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}`;
 }
 
 // ── Title cleanup ────────────────────────────────────────────────────────────
@@ -344,7 +336,8 @@ function parseEmail(r) {
   const aiCat   = (r[6] || '').trim().toLowerCase();
   const validCats = ['important','lab','dept','orgs','campus','promo','lowpri','_skip'];
   const cat     = validCats.includes(aiCat) ? aiCat : classify(from, subject);
-  const event   = (cat !== 'lowpri') ? detectEvent(subject, body) : null;
+  // Use AI-extracted event datetime from column 9
+  const event   = parseEventDt((r[8] || '').trim());
 
   // Use AI summary from column 8 if available, otherwise fall back to body snippet
   const aiSummary = (r[7] || '').trim();
@@ -465,7 +458,7 @@ function cardHTML(e) {
   let calTag = '';
   if (e.event) {
     const link = calendarLink(e.subject, e.event);
-    calTag = `<span class="cal-tag" onclick="event.stopPropagation();window.open('${link}','_blank')" title="Add to Google Calendar">${e.event.date} ${e.event.time} +cal</span>`;
+    calTag = `<span class="cal-tag" onclick="event.stopPropagation();window.open('${link}','_blank')" title="Add to Google Calendar">${e.event.display} +cal</span>`;
   }
 
   const preview = e.preview ? `<div class="email-preview">${e.preview.substring(0, 150)}</div>` : '';
