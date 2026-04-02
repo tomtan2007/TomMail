@@ -80,9 +80,11 @@
 
     /* ── Cards ── */
     .email-feed { display: flex; flex-direction: column; gap: 8px; }
-    .email-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; text-decoration: none; display: block; color: inherit; opacity: 0.55; }
-    .email-card:hover { border-color: var(--border-mid); opacity: 0.8; }
-    .email-card.unread { border-left: 3px solid var(--text); opacity: 1; }
+    .email-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; text-decoration: none; display: block; color: inherit; }
+    .email-card:hover { border-color: var(--border-mid); }
+    .email-card.read { opacity: 0.55; }
+    .email-card.read:hover { opacity: 0.8; }
+    .email-card.unread { border-left: 3px solid var(--text); }
     .email-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
     .email-card-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; }
     .email-date { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
@@ -474,8 +476,9 @@ function cardHTML(e) {
   } else if (e.preview) {
     body=`<div class="email-preview">${e.preview}</div>`;
   }
+  const readClass = e.isUnread ? ' unread' : ' read';
   if (e.isGrade) {
-    return `<a class="email-card${e.isUnread?' unread':''}" href="${e.gmailUrl}" target="_blank" rel="noopener">
+    return `<a class="email-card${readClass}" href="${e.gmailUrl}" target="_blank" rel="noopener">
       <div class="email-card-top">${pill}${badge}${srcTag}
         <div class="email-card-meta">
           <span class="email-date">${formatDate(e.ts)}</span>
@@ -485,7 +488,7 @@ function cardHTML(e) {
       <div class="email-title">${e.title}</div>${body}
     </a>`;
   }
-  return `<div class="email-card${e.isUnread?' unread':''}" style="cursor:pointer" onclick="openEmail('${e.id}')">
+  return `<div class="email-card${readClass}" style="cursor:pointer" onclick="openEmail('${e.id}')">
     <div class="email-card-top">${pill}${badge}${srcTag}
       <div class="email-card-meta">
         <span class="email-date">${formatDate(e.ts)}</span>

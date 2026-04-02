@@ -73,9 +73,11 @@
     .email-feed { display: flex; flex-direction: column; gap: 6px; }
     .email-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 0.875rem 1.125rem; display: block; color: inherit; cursor: pointer; }
     .email-card:hover { border-color: var(--border-mid); }
+    .email-card.read { opacity: 0.55; }
+    .email-card.read:hover { opacity: 0.8; }
     .email-card.unread { border-left: 3px solid var(--text); }
-    .email-card.low-pri { opacity: 0.55; }
-    .email-card.low-pri:hover { opacity: 0.8; }
+    .email-card.low-pri { opacity: 0.45; }
+    .email-card.low-pri:hover { opacity: 0.7; }
     .email-top { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
     .email-meta { margin-left: auto; display: flex; align-items: center; gap: 6px; }
     .email-date { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
@@ -503,7 +505,7 @@ function cardHTML(e) {
 
   const preview = e.preview ? `<div class="email-preview">${e.preview.substring(0, 150)}</div>` : '';
 
-  return `<div class="email-card${e.isUnread ? ' unread' : ''}${e.cat === 'lowpri' ? ' low-pri' : ''}" onclick="openEmail('${e.id}')">
+  return `<div class="email-card${e.isUnread ? ' unread' : ' read'}${e.cat === 'lowpri' ? ' low-pri' : ''}" onclick="openEmail('${e.id}')">
     <div class="email-top">
       ${pill}
       <span class="sender">${e.sender}</span>
