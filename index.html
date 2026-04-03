@@ -292,7 +292,7 @@ function parseAssignmentCSV(text) {
 }
 
 async function fetchAssignments() {
-  // Show cached data instantly
+  // Show cached data instantly while fetching
   const cached = localStorage.getItem('tcached');
   if (cached) {
     try {
@@ -301,19 +301,20 @@ async function fetchAssignments() {
     } catch {}
   }
 
-  if (!ASSIGNMENTS_CSV) {
-    // Prompt for URL if not set
+  let csvUrl = ASSIGNMENTS_CSV;
+  if (!csvUrl) {
     const url = prompt('Paste your published Google Sheet CSV URL for the assignments tab:');
     if (url && url.includes('docs.google.com')) {
       localStorage.setItem('assignments_csv_url', url);
-      location.reload();
+      csvUrl = url;
+    } else {
+      return;
     }
-    return;
   }
 
   document.getElementById('last-updated').textContent = 'Syncing...';
   try {
-    const r = await fetch(ASSIGNMENTS_CSV);
+    const r = await fetch(csvUrl + (csvUrl.includes('?') ? '&' : '?') + '_t=' + Date.now());
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const text = await r.text();
     const rows = parseAssignmentCSV(text);
